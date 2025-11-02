@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -9,12 +9,12 @@ import {
   Eye,
   LogOut,
   TrendingUp,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CountUp from "react-countup";
-import { getAllDesigns } from "@/lib/api";
-import toast from "react-hot-toast";
 
+// ✅ Mock data - only this will be shown
 const mockDesigns = [
   {
     id: 1,
@@ -72,33 +72,14 @@ const mockDesigns = [
   },
 ];
 
-const API_BASE_URL = "/api";
-
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const [newDesigns, setNewDesigns] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false); // Always false - no loading
 
-  useEffect(() => {
-    fetchDesigns();
-  }, []);
+  // ✅ Only use mock designs
+  const allDesigns = mockDesigns;
 
-  const fetchDesigns = async () => {
-    try {
-      const response = await getAllDesigns();
-      setNewDesigns(response.designs || []);
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching designs:", error);
-      // Don't show error toast, just use mock data
-      setLoading(false);
-    }
-  };
-
-  // Combine new uploads (first) with mock designs
-  const allDesigns = [...newDesigns, ...mockDesigns];
-
-  // Dynamic stats
+  // Stats based on mock data
   const stats = {
     protected: allDesigns.length,
     scans: allDesigns.length * 6,
@@ -200,7 +181,7 @@ const DashboardPage = () => {
           ))}
         </div>
 
-        {/* Design Gallery */}
+        {/* Design Gallery Header */}
         <div className="mb-8 flex items-center justify-between">
           <h2 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
             Your Protected Designs
@@ -214,102 +195,74 @@ const DashboardPage = () => {
           </Button>
         </div>
 
-        {loading ? (
-          <div className="text-center py-20">
+        {/* Design Gallery - Only Mock Data */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {allDesigns.map((design, i) => (
             <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full mx-auto"
-            />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allDesigns.map((design, i) => {
-              const isNewUpload = design._id; // New uploads have _id from MongoDB
-              const designId = design._id || design.id;
-              const imageUrl = isNewUpload
-                ? `${API_BASE_URL}/uploads/${design.image}`
-                : design.image;
+              key={design.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.1 }}
+              whileHover={{ y: -8 }}
+              className="group relative backdrop-blur-2xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/20"
+            >
+              {/* Image */}
+              <div className="relative h-48 overflow-hidden">
+                <img
+                  src={design.image}
+                  alt={design.title}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute bottom-4 left-4 right-4 flex justify-center">
+                    <Link to={`/design/${design.id}`}>
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 shadow-lg"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Details
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
 
-              return (
-                <motion.div
-                  key={designId}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  whileHover={{ y: -8 }}
-                  className="group relative backdrop-blur-2xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-purple-500/20"
-                >
-                  {/* NEW Badge for uploaded designs */}
-                  {isNewUpload && (
-                    <div className="absolute top-4 right-4 z-10 px-3 py-1 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold shadow-lg animate-pulse">
-                      NEW
-                    </div>
-                  )}
+              {/* Content */}
+              <div className="p-6">
+                <h3 className="text-lg font-bold mb-2 text-white truncate">
+                  {design.title}
+                </h3>
+                <div className="flex items-center justify-between text-sm text-gray-400 mb-4">
+                  <span>
+                    {new Date(design.uploadDate).toLocaleDateString()}
+                  </span>
+                  <span className="px-2 py-1 rounded-full bg-green-500/10 text-green-400 text-xs capitalize">
+                    {design.status}
+                  </span>
+                </div>
 
-                  {/* Image */}
-                  <div className="relative h-48 overflow-hidden">
-                    <img
-                      src={imageUrl}
-                      alt={design.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          "https://images.unsplash.com/photo-1626785774573-4b799315345d?w=400&h=300&fit=crop";
-                      }}
+                {/* Similarity Gauge */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Similarity Score</span>
+                    <span className="font-bold text-green-400">
+                      {design.similarity}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${design.similarity}%` }}
+                      transition={{ duration: 1, delay: i * 0.1 }}
+                      className="h-full bg-gradient-to-r from-green-500 to-cyan-500"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <div className="absolute bottom-4 left-4 right-4 flex justify-center">
-                        <Link to={`/design/${designId}`}>
-                          <Button
-                            size="sm"
-                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 shadow-lg"
-                          >
-                            <Eye className="w-4 h-4 mr-2" />
-                            View Details
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
                   </div>
-
-                  {/* Content */}
-                  <div className="p-6">
-                    <h3 className="text-lg font-bold mb-2 text-white">
-                      {design.title}
-                    </h3>
-                    <div className="flex items-center justify-between text-sm text-gray-400 mb-4">
-                      <span>
-                        {new Date(design.uploadDate).toLocaleDateString()}
-                      </span>
-                      <span className="px-2 py-1 rounded-full bg-green-500/10 text-green-400 text-xs">
-                        {design.status}
-                      </span>
-                    </div>
-
-                    {/* Similarity Gauge */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-400">Similarity Score</span>
-                        <span className="font-bold text-green-400">
-                          {design.similarity}%
-                        </span>
-                      </div>
-                      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${design.similarity}%` }}
-                          transition={{ duration: 1, delay: i * 0.1 }}
-                          className="h-full bg-gradient-to-r from-green-500 to-cyan-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        )}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </div>
   );

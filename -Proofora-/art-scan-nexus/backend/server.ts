@@ -4,15 +4,13 @@ import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import connectDB from "./config.ts";
-import authRoutes from "./routes/authRoutes.ts";
-import { User } from "./models/userModel.ts";
+import connectDB from "./config.js";
+import authRoutes from "./routes/authRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
+import compareRoutes from "./routes/compareRoute.js";
+import { User } from "./models/userModel.js";
 import Auth from "./utils/auth.js";
-import uploadRoutes from "./routes/uploadRoutes.ts";
-import designRoutes from "./routes/designRoutes.ts";
-import compareRoutes from "./routes/compareRoute.ts"; // Add this import
 
-// Get __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -21,89 +19,59 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5001;
 
-// Create uploads directory FIRST
+// Create uploads directory
 const uploadsDir = path.join(__dirname, "../uploads");
-console.log("📁 Uploads directory path:", uploadsDir);
-
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
   console.log("✅ Created uploads directory");
-} else {
-  console.log("✅ Uploads directory already exists");
 }
 
-// Middleware setup - order matters!
+// CORS
 app.use(
   cors({
-    origin: [
-      "http://localhost:8081",
-      "http://127.0.0.1:8081",
-      "http://localhost:8082",
-      "http://localhost:5173",
-    ],
+    origin: ["http://localhost:8081", "http://localhost:5173"],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// JSON parser with error handling
-app.use(
-  express.json({
-    strict: true,
-    type: "application/json",
-  })
-);
+// Body parsers
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Handle JSON parsing errors
-app.use(
-  (
-    err: any,
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction
-  ) => {
-    if (err instanceof SyntaxError && "body" in err) {
-      return res.status(400).json({ message: "Invalid JSON in request body" });
-    }
-    next(err);
-  }
-);
-
-// Set default Content-Type for JSON responses
-app.use((req, res, next) => {
-  const originalJson = res.json.bind(res);
-  res.json = function (body: any) {
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
-    return originalJson(body);
-  };
-  next();
-});
-
-// Debug: Log all requests with more details
+// Request logging
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
-// Serve uploaded files - MUST use absolute path
+// Static files
 app.use("/uploads", express.static(uploadsDir));
-console.log("✅ Serving uploads from:", uploadsDir);
 
-// Routes - all routes registered after express.json()
+// API ROUTES
 app.use("/api/auth", authRoutes);
-app.use("/api/upload", uploadRoutes);
-app.use("/api/designs", designRoutes);
-app.use("/api/compare", compareRoutes); // Add this line
-console.log(
-  "✅ Routes registered: /api/auth, /api/upload, /api/designs, /api/compare"
-);
+app.use("/api/designs", uploadRoutes); // Main upload route
+app.use("/api/compare", compareRoutes);
 
-// 404 handler - must be before error handler
-app.use((req: express.Request, res: express.Response) => {
-  console.log(`❌ 404 - Route not found: ${req.method} ${req.path}`);
-  res.status(404).json({ message: "Route not found" });
+console.log("✅ Routes:");
+console.log("   /api/auth");
+console.log("   /api/designs/save");
+console.log("   /api/designs/all");
+console.log("   /api/compare");
+
+// Health check
+app.get("/health", (req, res) => {
+  res.json({ status: "healthy" });
 });
 
-// Global error handler middleware
+// 404 handler
+app.use((req, res) => {
+  console.log(`❌ 404: ${req.method} ${req.path}`);
+  res.status(404).json({ success: false, message: "Route not found" });
+});
+
+// Error handler
 app.use(
   (
     err: any,
@@ -111,115 +79,41 @@ app.use(
     res: express.Response,
     next: express.NextFunction
   ) => {
-    if (res.headersSent) {
-      return next(err);
-    }
+    if (res.headersSent) return next(err);
 
-    console.error("❌ Unhandled error:", err);
-    console.error("Error stack:", err.stack);
+    console.error("\n❌ ERROR:", err.message);
+    console.error(err.stack);
 
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.status(err.status || 500).json({
+      success: false,
       message: err.message || "Internal server error",
-      error: process.env.NODE_ENV === "development" ? err.stack : undefined,
     });
   }
 );
 
+// Start server
 const start = async () => {
   try {
-    console.log("🚀 Starting server...");
-    console.log(`📌 Port: ${port}`);
+    console.log("\n🚀 STARTING PROOFORA BACKEND");
+    console.log(`Port: ${port}`);
+    console.log(`ML API: ${process.env.ML_API_URL || "http://localhost:8000"}`);
 
     const server = app.listen(port, () => {
-      console.log(`✅ Server running on port ${port}`);
-      console.log(`✅ Server is ready to accept requests`);
-      console.log(
-        `✅ Upload endpoint: http://localhost:${port}/api/designs/save`
-      );
-      console.log(
-        `✅ Compare endpoint: http://localhost:${port}/api/compare/compare`
-      ); // Add this line
+      console.log(`✅ Server: http://localhost:${port}`);
+      console.log(`✅ Upload: http://localhost:${port}/api/designs/save`);
+      console.log(`✅ Designs: http://localhost:${port}/api/designs/all\n`);
     });
 
-    // Handle server errors on the server instance
-    server.on("error", (error: any) => {
-      console.error("❌ Server error:", error);
-      if (error.code === "EADDRINUSE") {
-        console.error(
-          `❌ Port ${port} is already in use. Please stop the other process or use a different port.`
-        );
-        process.exit(1);
-      }
-    });
-
-    // Now try to connect to MongoDB (non-blocking)
     const dbConnected = await connectDB();
-
-    // Only seed users if database is connected
     if (dbConnected) {
-      try {
-        // Seed users with JWT tokens if they do not exist
-        const seedUsers = [
-          {
-            fullName: "Bhavya Aggarwal",
-            email: "bhavya@gmail.com",
-            password: "password123",
-          },
-          {
-            fullName: "Rijul Rangta",
-            email: "rijul@gmail.com",
-            password: "password1234",
-          },
-          {
-            fullName: "Vanni Chauhan",
-            email: "vanni@gmail.com",
-            password: "password1235",
-          },
-        ];
-
-        for (const su of seedUsers) {
-          try {
-            const existing = await User.findOne({ email: su.email });
-            if (!existing) {
-              const doc = new User(su);
-              await doc.save();
-              // Generate token after saving to get the _id
-              const token = Auth.generateToken(doc._id.toString());
-              (doc as any).token = token;
-              await doc.save();
-              console.log(`Seeded user: ${su.email} with token`);
-            } else {
-              console.log(`User ${su.email} already exists`);
-            }
-          } catch (seedError: any) {
-            console.error(`Error seeding user ${su.email}:`, seedError.message);
-          }
-        }
-      } catch (error: any) {
-        console.error("Error during user seeding:", error.message);
-      }
-    } else {
-      console.warn("⚠️  Skipping user seeding - MongoDB not connected");
-      console.warn(
-        "⚠️  WARNING: MongoDB is not connected. API endpoints will return errors."
-      );
+      console.log("✅ MongoDB connected\n");
     }
 
-    if (!process.env.JWT_SECRET) {
-      console.warn(
-        "⚠️  WARNING: JWT_SECRET is not set. Token generation will fail."
-      );
-    }
+    console.log("✅ BACKEND READY\n");
   } catch (error: any) {
-    console.error("❌ Failed to start server:", error);
-    console.error("Error details:", error.message);
-    console.error("Error stack:", error.stack);
+    console.error("\n❌ FAILED TO START:", error.message);
     process.exit(1);
   }
 };
 
-start().catch((error) => {
-  console.error("❌ Unhandled error in start function:", error);
-  process.exit(1);
-});
+start();

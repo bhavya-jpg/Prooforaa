@@ -11,7 +11,7 @@ def normalize_image_array(img_np):
     """Ensure image has 3 channels (RGB) and is properly shaped for comparison."""
     # Convert grayscale to RGB (H, W) → (H, W, 3)
     if img_np.ndim == 2:
-        img_np = np.stack([img_np] * 3, axis=-1)
+        img_np = np.stack([img_np] * 3, axis=-1 )
 
     # If RGBA, drop alpha channel
     elif img_np.shape[-1] == 4:

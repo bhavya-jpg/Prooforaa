@@ -1,10 +1,10 @@
-# utils.py
-
 import cv2
 import numpy as np
 from PIL import Image
 import imagehash
 import io
+import hashlib
+import json
 
 def load_image_bytes(image_bytes):
     """Load image from bytes into PIL Image."""
@@ -13,7 +13,7 @@ def load_image_bytes(image_bytes):
 def pil_to_np(pil_img: Image.Image, size=None):
     """Convert PIL Image to numpy array with optional resizing."""
     if size:
-        pil_img = pil_img.resize(size)
+        pil_img = pil_img.resize(size, Image.Resampling.LANCZOS)  # Use LANCZOS for better quality
     return np.array(pil_img)
 
 def load_image(image_path):
@@ -48,13 +48,20 @@ def match_orb_features(desc1, desc2):
     score = 1 - (sum(distances) / (len(distances) * 256))
     return max(0.0, min(score, 1.0))
 
-def compute_sha256_of_normalized(image_bytes):
-    """Compute SHA256 hash of normalized image bytes."""
-    import hashlib
-    pil_img = load_image_bytes(image_bytes)
-    # Normalize the image by converting to grayscale and resizing
-    normalized = pil_img.convert('L').resize((256, 256))
-    # Convert back to bytes in PNG format
-    with io.BytesIO() as byte_io:
-        normalized.save(byte_io, format='PNG')
-        return hashlib.sha256(byte_io.getvalue()).hexdigest()
+def compute_sha256_of_normalized(img_arr: np.ndarray, metadata: dict = None) -> str:
+    """
+    Compute SHA256 hash of normalized image array with optional metadata.
+    Used for blockchain proof generation.
+    """
+    # Convert array to bytes
+    img_bytes = img_arr.tobytes()
+    
+    hasher = hashlib.sha256()
+    hasher.update(img_bytes)
+    
+    # Include metadata if provided
+    if metadata:
+        meta_str = json.dumps(metadata, sort_keys=True)
+        hasher.update(meta_str.encode())
+    
+    return hasher.hexdigest()

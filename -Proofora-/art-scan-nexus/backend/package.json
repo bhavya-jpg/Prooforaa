@@ -17,19 +17,23 @@
     "dotenv": "^17.2.3",
     "exif-parser": "^0.1.12",
     "express": "^5.1.0",
+    "form-data": "^4.0.4",
     "fs-extra": "^11.3.2",
     "image-hash": "^6.0.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.2",
     "multer": "^2.0.2",
+    "node-fetch": "^2.7.0",
     "python-shell": "^5.0.0",
     "sharp": "^0.34.4"
   },
   "devDependencies": {
     "@types/express": "^5.0.5",
+    "@types/form-data": "^2.2.1",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.9.2",
+    "@types/node-fetch": "^2.6.13",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3"
