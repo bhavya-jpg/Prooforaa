@@ -1,0 +1,16 @@
+[package]
+name = "ProoforaDesignRegistry"
+version = "1.0.0"
+authors = []
+
+[addresses]
+proofora = "0xe2f454f8aad6f37e8df2e5d5321b47b9aac593cee77e99361ea12e30cd9ae110"
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]

@@ -1,4 +1,6 @@
 import express from "express";
+import blockchainRoutes from "./routes/blockchainRoutes.ts";
+import { initializeRegistry } from "./services/blockchainServices.ts";
 import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
@@ -10,29 +12,29 @@ import { User } from "./models/userModel.ts";
 import Auth from "./utils/auth.js";
 import uploadRoutes from "./routes/uploadRoutes.ts";
 import designRoutes from "./routes/designRoutes.ts";
-import compareRoutes from "./routes/compareRoute.ts"; // Add this import
+import compareRoutes from "./routes/compareRoute.ts";
+
+dotenv.config();
 
 // Get __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config();
-
 const app = express();
 const port = process.env.PORT || 5001;
 
-// Create uploads directory FIRST
+// Create uploads directory
 const uploadsDir = path.join(__dirname, "../uploads");
-console.log("📁 Uploads directory path:", uploadsDir);
+console.log("Uploads directory path:", uploadsDir);
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log("✅ Created uploads directory");
+  console.log("Created uploads directory");
 } else {
-  console.log("✅ Uploads directory already exists");
+  console.log("Uploads directory already exists");
 }
 
-// Middleware setup - order matters!
+// Middleware setup
 app.use(
   cors({
     origin: [
@@ -45,13 +47,7 @@ app.use(
   })
 );
 
-// JSON parser with error handling
-app.use(
-  express.json({
-    strict: true,
-    type: "application/json",
-  })
-);
+app.use(express.json());
 
 // Handle JSON parsing errors
 app.use(
@@ -68,7 +64,7 @@ app.use(
   }
 );
 
-// Set default Content-Type for JSON responses
+// Add default Content-Type for JSON
 app.use((req, res, next) => {
   const originalJson = res.json.bind(res);
   res.json = function (body: any) {
@@ -78,32 +74,33 @@ app.use((req, res, next) => {
   next();
 });
 
-// Debug: Log all requests with more details
+// Log all requests
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
-// Serve uploaded files - MUST use absolute path
+// Serve uploaded files
 app.use("/uploads", express.static(uploadsDir));
-console.log("✅ Serving uploads from:", uploadsDir);
+console.log("Serving uploads from:", uploadsDir);
 
-// Routes - all routes registered after express.json()
+// Register routes
 app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/designs", designRoutes);
-app.use("/api/compare", compareRoutes); // Add this line
+app.use("/api/blockchain", blockchainRoutes);
+app.use("/api/compare", compareRoutes);
 console.log(
-  "✅ Routes registered: /api/auth, /api/upload, /api/designs, /api/compare"
+  "Routes registered: /api/auth, /api/upload, /api/designs, /api/blockchain, /api/compare"
 );
 
-// 404 handler - must be before error handler
+// 404 Handler
 app.use((req: express.Request, res: express.Response) => {
-  console.log(`❌ 404 - Route not found: ${req.method} ${req.path}`);
+  console.log(`404 - Route not found: ${req.method} ${req.path}`);
   res.status(404).json({ message: "Route not found" });
 });
 
-// Global error handler middleware
+// Global error handler
 app.use(
   (
     err: any,
@@ -111,14 +108,11 @@ app.use(
     res: express.Response,
     next: express.NextFunction
   ) => {
-    if (res.headersSent) {
-      return next(err);
-    }
+    if (res.headersSent) return next(err);
 
-    console.error("❌ Unhandled error:", err);
+    console.error("Unhandled error:", err);
     console.error("Error stack:", err.stack);
 
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.status(err.status || 500).json({
       message: err.message || "Internal server error",
       error: process.env.NODE_ENV === "development" ? err.stack : undefined,
@@ -128,98 +122,86 @@ app.use(
 
 const start = async () => {
   try {
-    console.log("🚀 Starting server...");
-    console.log(`📌 Port: ${port}`);
+    console.log("Starting server...");
+    console.log(`Port: ${port}`);
 
+    // ✅ Connect MongoDB FIRST
+    const dbConnected = await connectDB();
+    if (!dbConnected) {
+      console.error("MongoDB connection failed. Stopping server startup.");
+      process.exit(1);
+    }
+
+    // ✅ Initialize Blockchain AFTER DB
+    await initializeRegistry();
+
+    // ✅ Start Express Server
     const server = app.listen(port, () => {
       console.log(`✅ Server running on port ${port}`);
-      console.log(`✅ Server is ready to accept requests`);
       console.log(
-        `✅ Upload endpoint: http://localhost:${port}/api/designs/save`
+        `Upload endpoint: http://localhost:${port}/api/designs/save`
       );
       console.log(
-        `✅ Compare endpoint: http://localhost:${port}/api/compare/compare`
-      ); // Add this line
+        `Compare endpoint: http://localhost:${port}/api/compare/compare`
+      );
     });
 
-    // Handle server errors on the server instance
     server.on("error", (error: any) => {
-      console.error("❌ Server error:", error);
+      console.error("Server error:", error);
       if (error.code === "EADDRINUSE") {
-        console.error(
-          `❌ Port ${port} is already in use. Please stop the other process or use a different port.`
-        );
+        console.error(`Port ${port} is already in use.`);
         process.exit(1);
       }
     });
 
-    // Now try to connect to MongoDB (non-blocking)
-    const dbConnected = await connectDB();
+    // ✅ Seed Users (only if connected)
+    const seedUsers = [
+      {
+        fullName: "Bhavya Aggarwal",
+        email: "bhavya@gmail.com",
+        password: "password123",
+      },
+      {
+        fullName: "Rijul Rangta",
+        email: "rijul@gmail.com",
+        password: "password1234",
+      },
+      {
+        fullName: "Vanni Chauhan",
+        email: "vanni@gmail.com",
+        password: "password1235",
+      },
+    ];
 
-    // Only seed users if database is connected
-    if (dbConnected) {
+    for (const su of seedUsers) {
       try {
-        // Seed users with JWT tokens if they do not exist
-        const seedUsers = [
-          {
-            fullName: "Bhavya Aggarwal",
-            email: "bhavya@gmail.com",
-            password: "password123",
-          },
-          {
-            fullName: "Rijul Rangta",
-            email: "rijul@gmail.com",
-            password: "password1234",
-          },
-          {
-            fullName: "Vanni Chauhan",
-            email: "vanni@gmail.com",
-            password: "password1235",
-          },
-        ];
-
-        for (const su of seedUsers) {
-          try {
-            const existing = await User.findOne({ email: su.email });
-            if (!existing) {
-              const doc = new User(su);
-              await doc.save();
-              // Generate token after saving to get the _id
-              const token = Auth.generateToken(doc._id.toString());
-              (doc as any).token = token;
-              await doc.save();
-              console.log(`Seeded user: ${su.email} with token`);
-            } else {
-              console.log(`User ${su.email} already exists`);
-            }
-          } catch (seedError: any) {
-            console.error(`Error seeding user ${su.email}:`, seedError.message);
-          }
+        const existing = await User.findOne({ email: su.email });
+        if (!existing) {
+          const doc = new User(su);
+          await doc.save();
+          const token = Auth.generateToken(doc._id.toString());
+          (doc as any).token = token;
+          await doc.save();
+          console.log(`Seeded user: ${su.email}`);
+        } else {
+          console.log(`User ${su.email} already exists`);
         }
-      } catch (error: any) {
-        console.error("Error during user seeding:", error.message);
+      } catch (seedError: any) {
+        console.error(`Error seeding user ${su.email}:`, seedError.message);
       }
-    } else {
-      console.warn("⚠️  Skipping user seeding - MongoDB not connected");
-      console.warn(
-        "⚠️  WARNING: MongoDB is not connected. API endpoints will return errors."
-      );
     }
 
     if (!process.env.JWT_SECRET) {
-      console.warn(
-        "⚠️  WARNING: JWT_SECRET is not set. Token generation will fail."
-      );
+      console.warn("JWT_SECRET not set in .env file");
     }
   } catch (error: any) {
-    console.error("❌ Failed to start server:", error);
-    console.error("Error details:", error.message);
-    console.error("Error stack:", error.stack);
+    console.error("Failed to start server:", error.message);
+    console.error(error.stack);
     process.exit(1);
   }
 };
 
 start().catch((error) => {
-  console.error("❌ Unhandled error in start function:", error);
+  console.error("Unhandled error in start():", error);
   process.exit(1);
 });

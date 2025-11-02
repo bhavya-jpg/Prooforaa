@@ -1,3 +1,4 @@
+import { BlockchainUpload } from "./pages/BlockchainUpload.tsx"; // ← ADD CURLY BRACES
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/upload" element={<UploadPage />} />
           <Route path="/compare" element={<ComparePage />} />
+          <Route path="/blockchain" element={<BlockchainUpload />} />
           <Route path="/design/:id" element={<DesignDetailPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
