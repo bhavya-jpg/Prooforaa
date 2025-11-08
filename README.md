@@ -1,4 +1,4 @@
-<img width="1568" height="756" alt="image" src="https://github.com/user-attachments/assets/54b71612-fda3-4363-ace9-639ef0c07103" />🧾 Proofora - Blockchain-based Design Ownership Verification System
+🧾 Proofora - Blockchain-based Design Ownership Verification System
 
 🚀 Description
 
@@ -100,6 +100,8 @@ This hash, along with metadata (timestamp and wallet ID), is sent to the design_
 The frontend (React) and backend (Node.js) communicate through API calls that interact with Aptos using the Aptos SDK and CLI.
 
 The blockchain record is then reflected in the user’s Proofora dashboard, displaying verified ownership and transaction details
+
+<img width="1568" height="756" alt="image" src="https://github.com/user-attachments/assets/54b71612-fda3-4363-ace9-639ef0c07103" />
 
 
 
